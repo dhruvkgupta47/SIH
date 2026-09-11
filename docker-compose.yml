@@ -1,0 +1,52 @@
+# ===========================================================================
+# SIH26070 — Docker Compose Orchestration
+# Services:
+#   1. api: FastAPI + PyTorch + ResNet + Transformer (Port 8000)
+#   2. db: PostgreSQL 16 + PostGIS extension (Port 5432)
+# ===========================================================================
+
+version: "3.8"
+
+services:
+  # ── Backend AI/ML API Service ───────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sih_cyclone_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://cyclone_user:cyclone_pass@db:5432/cyclone_db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── PostgreSQL with PostGIS Geospatial Extension ───────────────────────
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: sih_cyclone_db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=cyclone_user
+      - POSTGRES_PASSWORD=cyclone_pass
+      - POSTGRES_DB=cyclone_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyclone_user -d cyclone_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
